@@ -3,15 +3,17 @@ name: Terraform Apply
 on:
   push:
     branches:
-     # - main
+      - main
       - feature/*
     paths:
       - 'devops-lab/**'
+      - '.github/workflows/**'
   pull_request:
     branches:
       - main
     paths:
       - 'devops-lab/**'
+      - '.github/workflows/**'
 
 permissions:
   id-token: write
