@@ -1,0 +1,64 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches:
+     # - main
+      - feature/*
+    paths:
+      - 'devops-lab/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'devops-lab/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7
+
+      - name: Resolve AWS_ROLE_ARN
+        id: resolve_role_arn
+        run: |
+          ROLE_ARN=""
+          if [ -f devops-lab/terraform/terraform.tfvars ]; then
+            ROLE_ARN=$(grep '^aws_role_arn' devops-lab/terraform/terraform.tfvars | sed -E 's/^[^=]*=//' | tr -d ' "')
+          fi
+          if [ -z "$ROLE_ARN" ]; then
+            echo "Unable to resolve AWS_ROLE_ARN from terraform.tfvars"
+            exit 1
+          fi
+          echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ steps.resolve_role_arn.outputs.role_arn }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: devops-lab/terraform
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        working-directory: devops-lab/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: devops-lab/terraform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: devops-lab/terraform
+        run: terraform apply -auto-approve tfplan
