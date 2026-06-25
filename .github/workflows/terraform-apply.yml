@@ -6,13 +6,13 @@ on:
       - main
       - feature/*
     paths:
-      - 'devops-lab/**'
+      - 'terraform/**'
       - '.github/workflows/**'
   pull_request:
     branches:
       - main
     paths:
-      - 'devops-lab/**'
+      - 'terraform/**'
       - '.github/workflows/**'
 
 permissions:
