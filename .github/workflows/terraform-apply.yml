@@ -34,8 +34,8 @@ jobs:
         id: resolve_role_arn
         run: |
           ROLE_ARN=""
-          if [ -f devops-lab/terraform/terraform.tfvars ]; then
-            ROLE_ARN=$(grep '^aws_role_arn' devops-lab/terraform/terraform.tfvars | sed -E 's/^[^=]*=//' | tr -d ' "')
+          if [ -f terraform/terraform.tfvars ]; then
+            ROLE_ARN=$(grep '^aws_role_arn' terraform/terraform.tfvars | sed -E 's/^[^=]*=//' | tr -d ' "')
           fi
           if [ -z "$ROLE_ARN" ]; then
             echo "Unable to resolve AWS_ROLE_ARN from terraform.tfvars"
