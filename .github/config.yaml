@@ -1,1 +1,1 @@
-aws_role_arn: "arn:aws:iam::123456789012:role/your-role-name"
+aws_role_arn: "arn:aws:iam::820451690888:role/devops-lab-assume-role"
