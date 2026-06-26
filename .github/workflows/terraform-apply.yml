@@ -48,7 +48,7 @@ jobs:
           aws-region: us-east-1 # Fixed indentation
 
       - name: Terraform Init
-        working-directory: devops-lab/terraform
+        working-directory: terraform
         run: terraform init -input=false
 
       - name: Terraform Validate
