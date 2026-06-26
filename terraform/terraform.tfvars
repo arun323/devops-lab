@@ -1,5 +1,3 @@
-aws_role_arn      = "arn:aws:iam::820451690888:role/devops-lab-assume-role"
-
 # VPC example values
 vpc_name = "devops-lab-vpc"
 vpc_cidr = "10.0.0.0/16"

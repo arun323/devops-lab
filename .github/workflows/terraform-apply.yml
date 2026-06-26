@@ -19,6 +19,11 @@ permissions:
   id-token: write
   contents: read
 
+# Prevents concurrent deployments from corrupting Terraform state
+concurrency:
+  group: terraform-deploy
+  cancel-in-progress: false
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
@@ -30,38 +35,17 @@ jobs:
         with:
           terraform_version: 1.5.7
 
-      - name: Resolve AWS_ROLE_ARN
-        id: resolve_role_arn
+      - name: Read Role ARN from Config
+        id: read_config
         run: |
-          ROLE_ARN=""
-          # Removed 'devops-lab/' because checkout places you directly inside the repo root
-          candidates=("terraform/terraform.tfvars" "terraform/terraform.tfvars")
-          
-          for f in "${candidates[@]}"; do
-            if [ -f "$f" ]; then
-              # Adjusted to look for 'role_arn' instead of 'aws_role_arn'
-              ROLE_ARN=$(grep -E '^\s*role_arn\s*=' "$f" | sed -E 's/.*=\s*"([^"]*)".*/\1/')
-              if [ -n "$ROLE_ARN" ]; then
-                break
-              fi
-            fi
-          done
-
-          if [ -z "$ROLE_ARN" ]; then
-            echo "Unable to resolve role_arn from locations: ${candidates[*]}"
-            exit 1
-          fi
-
-          # Security best practice: Mask the ARN from being leaked in public runner logs
-          echo "::add-mask::$ROLE_ARN"
-          
+          ROLE_ARN=$(yq '.aws_role_arn' .github/config.yaml)
           echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ steps.resolve_role_arn.outputs.role_arn }}
-          aws-region: us-east-1
+          role-to-assume: ${{ steps.read_config.outputs.role_arn }} # Fixed step ID reference
+          aws-region: us-east-1 # Fixed indentation
 
       - name: Terraform Init
         working-directory: devops-lab/terraform
@@ -75,6 +59,7 @@ jobs:
         working-directory: devops-lab/terraform
         run: terraform plan -out=tfplan
 
+      # Optional: Only apply on main branch push to prevent feature branches from deploying prematurely
       - name: Terraform Apply
         working-directory: devops-lab/terraform
         run: terraform apply -auto-approve tfplan
