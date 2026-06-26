@@ -34,19 +34,27 @@ jobs:
         id: resolve_role_arn
         run: |
           ROLE_ARN=""
-          candidates=("terraform/terraform.tfvars" "devops-lab/terraform/terraform.tfvars" "terraform/terraform.tfvars.example" "devops-lab/terraform/terraform.tfvars.example")
+          # Removed 'devops-lab/' because checkout places you directly inside the repo root
+          candidates=("terraform/terraform.tfvars" "terraform/terraform.tfvars")
+          
           for f in "${candidates[@]}"; do
             if [ -f "$f" ]; then
-              ROLE_ARN=$(grep -E '^aws_role_arn' "$f" | sed -E 's/^[^=]*=//' | tr -d ' "')
+              # Adjusted to look for 'role_arn' instead of 'aws_role_arn'
+              ROLE_ARN=$(grep -E '^\s*role_arn\s*=' "$f" | sed -E 's/.*=\s*"([^"]*)".*/\1/')
               if [ -n "$ROLE_ARN" ]; then
                 break
               fi
             fi
           done
+
           if [ -z "$ROLE_ARN" ]; then
-            echo "Unable to resolve AWS_ROLE_ARN from terraform.tfvars locations: ${candidates[*]}"
+            echo "Unable to resolve role_arn from locations: ${candidates[*]}"
             exit 1
           fi
+
+          # Security best practice: Mask the ARN from being leaked in public runner logs
+          echo "::add-mask::$ROLE_ARN"
+          
           echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials from OIDC
