@@ -52,14 +52,14 @@ jobs:
         run: terraform init -input=false
 
       - name: Terraform Validate
-        working-directory: devops-lab/terraform
+        working-directory: terraform
         run: terraform validate
 
       - name: Terraform Plan
-        working-directory: devops-lab/terraform
+        working-directory: terraform
         run: terraform plan -out=tfplan
 
       # Optional: Only apply on main branch push to prevent feature branches from deploying prematurely
       - name: Terraform Apply
-        working-directory: devops-lab/terraform
+        working-directory: terraform
         run: terraform apply -auto-approve tfplan
