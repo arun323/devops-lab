@@ -59,7 +59,12 @@ jobs:
         working-directory: terraform
         run: terraform plan -out=tfplan
 
-      # Optional: Only apply on main branch push to prevent feature branches from deploying prematurely
-      - name: Terraform Apply
+      - name: Terraform Destroy
+        # Optional: Only run destroy on a specific branch or manually if needed
         working-directory: terraform
-        run: terraform apply -auto-approve tfplan
+        run: terraform destroy -auto-approve   
+
+      # # Optional: Only apply on main branch push to prevent feature branches from deploying prematurely
+      # - name: Terraform Apply
+      #   working-directory: terraform
+      #   run: terraform apply -auto-approve tfplan
