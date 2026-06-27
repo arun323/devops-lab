@@ -1,1 +1,5 @@
-aws_role_arn: "arn:aws:iam::820451690888:role/devops-lab-assume-role"
+
+aws_role_arns:
+  dev: "arn:aws:iam::820451690888:role/devops-lab-assume-role"
+  qa: "xxxx"
+  prd: "xxxxx"

@@ -1,31 +1,71 @@
-name: Terraform Apply
+name: AWS Infrastructure Deployment
 
 on:
   push:
     branches:
       - main
+      - qa
+      - dev
       - feature/*
     paths:
-      - 'terraform/**'
-      - '.github/workflows/**'
+      - 'terraform/infra/**'
+      - '.github/config.yaml'
   pull_request:
     branches:
       - main
+      - qa
+      - dev
     paths:
-      - 'terraform/**'
-      - '.github/workflows/**'
+      - 'terraform/infra/**'
+      - '.github/config.yaml'
+
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: 'Run terraform destroy'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
   contents: read
 
-# Prevents concurrent deployments from corrupting Terraform state
 concurrency:
-  group: terraform-deploy
+  group: AWS Infrastructure Deployment
   cancel-in-progress: false
 
 jobs:
-  terraform:
+  set-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      env_name: ${{steps.env.outputs.env_name}}
+      backend_path: ${{steps.env.outputs.backend_path}}
+      role_arn: ${{steps.env.outputs.role_arn}}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine environment and role ARN
+        id: env
+        run: |
+          echo "GITHUB_REF=$GITHUB_REF"
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            ENV=prd
+          elif [[ "$GITHUB_REF" == "refs/heads/qa" ]]; then
+            ENV=qa
+          else
+            ENV=dev
+          fi
+          ROLE_ARN=$(yq ".aws_role_arns.$ENV" .github/config.yaml)
+          if [[ -z "$ROLE_ARN" ]]; then
+            ROLE_ARN=$(yq '.aws_role_arn' .github/config.yaml)
+          fi
+          echo "env_name=$ENV" >> "$GITHUB_OUTPUT"
+          echo "backend_path=../config/$ENV/backend.conf" >> "$GITHUB_OUTPUT"
+          echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
+
+  terraform-init-validate:
+    needs: [set-environment]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,36 +75,84 @@ jobs:
         with:
           terraform_version: 1.5.7
 
-      - name: Read Role ARN from Config
-        id: read_config
-        run: |
-          ROLE_ARN=$(yq '.aws_role_arn' .github/config.yaml)
-          echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ needs.set-environment.outputs.role_arn }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: terraform/infra
+        run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
+
+      - name: Terraform Validate
+        working-directory: terraform/infra
+        run: terraform validate
+
+      - name: Terraform Format
+        working-directory: terraform/infra
+        run: terraform fmt -check -recursive  
+
+
+  terraform-plan:
+    needs: [set-environment, terraform-init-validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7
 
       - name: Configure AWS credentials from OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ steps.read_config.outputs.role_arn }} # Fixed step ID reference
-          aws-region: us-east-1 # Fixed indentation
+          role-to-assume: ${{ needs.set-environment.outputs.role_arn }}
+          aws-region: us-east-1
 
       - name: Terraform Init
-        working-directory: terraform
-        run: terraform init -input=false
-
-      - name: Terraform Validate
-        working-directory: terraform
-        run: terraform validate
+        working-directory: terraform/infra
+        run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
 
       - name: Terraform Plan
-        working-directory: terraform
+        working-directory: terraform/infra
         run: terraform plan -out=tfplan
 
-      - name: Terraform Destroy
-        # Optional: Only run destroy on a specific branch or manually if needed
-        working-directory: terraform
-        run: terraform destroy -auto-approve   
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: terraform/infra/tfplan
 
-      # # Optional: Only apply on main branch push to prevent feature branches from deploying prematurely
-      # - name: Terraform Apply
-      #   working-directory: terraform
-      #   run: terraform apply -auto-approve tfplan
+  terraform-apply:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/qa'
+    needs: [set-environment, terraform-init-validate, terraform-plan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ needs.set-environment.outputs.role_arn }}
+          aws-region: us-east-1
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: terraform/infra
+
+      - name: Terraform Init
+        working-directory: terraform/infra
+        run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
+
+      - name: Terraform Apply
+        working-directory: terraform/infra
+        run: terraform apply -auto-approve tfplan

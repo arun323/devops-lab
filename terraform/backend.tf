@@ -1,8 +1,0 @@
-terraform {
-  backend "s3" {
-    bucket  = "devops-lab-state-bucket"
-    key     = "devops-lab/terraform.tfstate"
-    region  = "us-east-1"
-    encrypt = true
-  }
-}
