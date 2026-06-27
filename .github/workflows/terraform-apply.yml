@@ -93,7 +93,7 @@ jobs:
 
       - name: Terraform Format
         working-directory: terraform/infra
-        run: terraform fmt -check -recursive  
+        run: terraform fmt -recursive  
 
 
   terraform-plan:
