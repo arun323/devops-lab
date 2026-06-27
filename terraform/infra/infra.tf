@@ -20,18 +20,18 @@ module "vpc" {
   allow_ssh            = var.allow_ssh
 }
 
-module "eks" {
-  count = var.create_eks ? 1 : 0
-  source = "../modules/eks"
+# module "eks" {
+#   count = var.create_eks ? 1 : 0
+#   source = "../modules/eks"
 
-  cluster_name = var.eks_cluster_name
-  vpc_id       = local.eks_vpc_id
-  subnet_ids   = local.eks_subnet_ids
-}
+#   cluster_name = var.eks_cluster_name
+#   vpc_id       = local.eks_vpc_id
+#   subnet_ids   = local.eks_subnet_ids
+# }
 
-module "ecr" {
-  count = var.create_ecr ? 1 : 0
-  source = "../modules/ecr"
+# module "ecr" {
+#   count = var.create_ecr ? 1 : 0
+#   source = "../modules/ecr"
 
-  repository_name = var.ecr_repository_name
-}
+#   repository_name = var.ecr_repository_name
+# }

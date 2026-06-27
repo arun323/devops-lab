@@ -2,9 +2,6 @@ aws_region            = "us-east-1"
 
 # Enable only the modules you want to deploy.
 create_vpc             = true
-create_eks             = false
-create_ecr             = false
-
 environment           = "dev"
 
 # VPC values (used only when create_vpc = true)

@@ -60,6 +60,8 @@ jobs:
           if [[ -z "$ROLE_ARN" ]]; then
             ROLE_ARN=$(yq '.aws_role_arn' .github/config.yaml)
           fi
+          echo "Selected environment: $ENV"
+          echo "Selected role ARN: $ROLE_ARN"
           echo "env_name=$ENV" >> "$GITHUB_OUTPUT"
           echo "backend_path=../config/$ENV/backend.conf" >> "$GITHUB_OUTPUT"
           echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
