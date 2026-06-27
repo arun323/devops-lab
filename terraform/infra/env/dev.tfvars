@@ -20,3 +20,4 @@ private_subnet_cidrs  = ["10.0.3.0/24", "10.0.4.0/24"]
 
 # # ECR values (used only when create_ecr = true)
 # ecr_repository_name   = "dev-app-repo"
+

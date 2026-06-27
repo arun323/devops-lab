@@ -63,9 +63,10 @@ jobs:
           fi
           echo "Selected environment: $ENV"
           echo "Selected role ARN: $ROLE_ARN"
+          echo "Selected tfvars path: env/$ENV/$ENV.tfvars"
           echo "env_name=$ENV" >> "$GITHUB_OUTPUT"
           echo "backend_path=../config/$ENV/backend.conf" >> "$GITHUB_OUTPUT"
-          echo "var_file_path=../env/$ENV/$ENV.tfvars" >> "$GITHUB_OUTPUT"
+          echo "var_file_path=env/$ENV/$ENV.tfvars" >> "$GITHUB_OUTPUT"
           echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
 
   terraform-init-validate:
