@@ -42,6 +42,7 @@ jobs:
       env_name: ${{steps.env.outputs.env_name}}
       backend_path: ${{steps.env.outputs.backend_path}}
       role_arn: ${{steps.env.outputs.role_arn}}
+      var_file_path: ${{steps.env.outputs.var_file_path}}
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +65,7 @@ jobs:
           echo "Selected role ARN: $ROLE_ARN"
           echo "env_name=$ENV" >> "$GITHUB_OUTPUT"
           echo "backend_path=../config/$ENV/backend.conf" >> "$GITHUB_OUTPUT"
+          echo "var_file_path=../env/$ENV/$ENV.tfvars" >> "$GITHUB_OUTPUT"
           echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
 
   terraform-init-validate:
@@ -119,7 +121,7 @@ jobs:
 
       - name: Terraform Plan
         working-directory: terraform/infra
-        run: terraform plan -out=tfplan
+        run: terraform plan -var-file=${{ needs.set-environment.outputs.var_file_path }} -out=tfplan
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4

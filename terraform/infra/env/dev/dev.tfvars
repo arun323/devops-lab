@@ -21,4 +21,3 @@ eks_subnet_ids        = []
 
 # ECR values (used only when create_ecr = true)
 ecr_repository_name   = "dev-app-repo"
-
