@@ -43,6 +43,9 @@ jobs:
       backend_path: ${{steps.env.outputs.backend_path}}
       role_arn: ${{steps.env.outputs.role_arn}}
       var_file_path: ${{steps.env.outputs.var_file_path}}
+      aws_region: ${{steps.env.outputs.aws_region}}
+      working_dir: ${{steps.env.outputs.working_dir}}
+      terraform_version: ${{steps.env.outputs.terraform_version}}
       plan_artifact_name: ${{steps.env.outputs.plan_artifact_name}}
       plan_environment_name: ${{steps.env.outputs.plan_environment_name}}
       apply_environment_name: ${{steps.env.outputs.apply_environment_name}}
