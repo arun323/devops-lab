@@ -47,8 +47,6 @@ jobs:
       working_dir: ${{steps.env.outputs.working_dir}}
       terraform_version: ${{steps.env.outputs.terraform_version}}
       plan_artifact_name: ${{steps.env.outputs.plan_artifact_name}}
-      plan_environment_name: ${{steps.env.outputs.plan_environment_name}}
-      apply_environment_name: ${{steps.env.outputs.apply_environment_name}}
     steps:
       - uses: actions/checkout@v4
 
@@ -76,8 +74,6 @@ jobs:
           PLAN_ARTIFACT_NAME=$(yq -r '.common.plan_artifact_name' .github/config.yaml)
           BACKEND_PATH=$(yq -r ".environments.$ENV.backend_path" .github/config.yaml)
           VAR_FILE_PATH=$(yq -r ".environments.$ENV.var_file_path" .github/config.yaml)
-          PLAN_ENVIRONMENT_NAME=$(yq -r ".environments.$ENV.plan_environment_name" .github/config.yaml)
-          APPLY_ENVIRONMENT_NAME=$(yq -r ".environments.$ENV.apply_environment_name" .github/config.yaml)
           if [[ "$BACKEND_PATH" == "null" || -z "$BACKEND_PATH" ]]; then
             BACKEND_PATH=$(yq -r '.common.backend_path_template' .github/config.yaml)
           fi
@@ -99,8 +95,6 @@ jobs:
           echo "working_dir=$WORKING_DIR" >> "$GITHUB_OUTPUT"
           echo "terraform_version=$TERRAFORM_VERSION" >> "$GITHUB_OUTPUT"
           echo "plan_artifact_name=$PLAN_ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
-          echo "plan_environment_name=$PLAN_ENVIRONMENT_NAME" >> "$GITHUB_OUTPUT"
-          echo "apply_environment_name=$APPLY_ENVIRONMENT_NAME" >> "$GITHUB_OUTPUT"
 
   terraform-init-validate:
     needs: [set-environment]
@@ -138,7 +132,6 @@ jobs:
   terraform-plan:
     needs: [set-environment, terraform-init-validate]
     runs-on: ubuntu-latest
-    environment: ${{ needs.set-environment.outputs.plan_environment_name }}
     env:
       AWS_REGION: ${{ needs.set-environment.outputs.aws_region }}
       TERRAFORM_VERSION: ${{ needs.set-environment.outputs.terraform_version }}
@@ -174,7 +167,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/qa'
     needs: [set-environment, terraform-init-validate, terraform-plan]
     runs-on: ubuntu-latest
-    environment: ${{ needs.set-environment.outputs.apply_environment_name }}
+    environment: ${{ needs.set-environment.outputs.env_name }}
     env:
       AWS_REGION: ${{ needs.set-environment.outputs.aws_region }}
       TERRAFORM_VERSION: ${{ needs.set-environment.outputs.terraform_version }}
