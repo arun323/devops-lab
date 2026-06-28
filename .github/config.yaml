@@ -11,11 +11,17 @@ environments:
     role_arn: "arn:aws:iam::820451690888:role/devops-lab-assume-role"
     backend_path: ../config/dev/backend.conf
     var_file_path: env/dev/dev.tfvars
+    plan_environment_name: dev-plan
+    apply_environment_name: dev-apply
   qa:
     role_arn: "xxxx"
     backend_path: ../config/qa/backend.conf
     var_file_path: env/qa/qa.tfvars
+    plan_environment_name: qa-plan
+    apply_environment_name: qa-apply
   prd:
     role_arn: "xxxxx"
     backend_path: ../config/prd/backend.conf
     var_file_path: env/prd/prd.tfvars
+    plan_environment_name: prd-plan
+    apply_environment_name: prd-apply
