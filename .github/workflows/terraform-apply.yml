@@ -1,0 +1,231 @@
+name: AWS Infrastructure Deployment
+
+on:
+  push:
+    branches:
+      - main
+      - qa
+      - dev
+      - feature/*
+    paths:
+      - 'terraform/infra/**'
+      - '.github/config.yaml'
+  pull_request:
+    branches:
+      - main
+      - qa
+      - dev
+    paths:
+      - 'terraform/infra/**'
+      - '.github/config.yaml'
+
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: 'Run terraform destroy'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: AWS Infrastructure Deployment
+  cancel-in-progress: false
+
+jobs:
+  set-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      env_name: ${{steps.env.outputs.env_name}}
+      backend_path: ${{steps.env.outputs.backend_path}}
+      role_arn: ${{steps.env.outputs.role_arn}}
+      var_file_path: ${{steps.env.outputs.var_file_path}}
+      aws_region: ${{steps.env.outputs.aws_region}}
+      working_dir: ${{steps.env.outputs.working_dir}}
+      terraform_version: ${{steps.env.outputs.terraform_version}}
+      plan_artifact_name: ${{steps.env.outputs.plan_artifact_name}}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install yq
+
+      - name: Determine environment and role ARN
+        id: env
+        run: |
+          echo "GITHUB_REF=$GITHUB_REF"
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            ENV=prd
+          elif [[ "$GITHUB_REF" == "refs/heads/qa" ]]; then
+            ENV=qa
+          else
+            ENV=dev
+          fi
+          ROLE_ARN=$(yq -r ".environments.$ENV.role_arn" .github/config.yaml)
+          AWS_REGION=$(yq -r '.common.aws_region' .github/config.yaml)
+          WORKING_DIR=$(yq -r '.common.terraform_working_dir' .github/config.yaml)
+          TERRAFORM_VERSION=$(yq -r '.common.terraform_version' .github/config.yaml)
+          PLAN_ARTIFACT_NAME=$(yq -r '.common.plan_artifact_name' .github/config.yaml)
+          BACKEND_PATH=$(yq -r ".environments.$ENV.backend_path" .github/config.yaml)
+          VAR_FILE_PATH=$(yq -r ".environments.$ENV.var_file_path" .github/config.yaml)
+          if [[ "$BACKEND_PATH" == "null" || -z "$BACKEND_PATH" ]]; then
+            BACKEND_PATH=$(yq -r '.common.backend_path_template' .github/config.yaml)
+          fi
+          if [[ "$VAR_FILE_PATH" == "null" || -z "$VAR_FILE_PATH" ]]; then
+            VAR_FILE_PATH=$(yq -r '.common.var_file_path_template' .github/config.yaml)
+          fi
+          BACKEND_PATH=${BACKEND_PATH//\$ENV/$ENV}
+          VAR_FILE_PATH=${VAR_FILE_PATH//\$ENV/$ENV}
+          echo "Selected environment: $ENV"
+          echo "Selected role ARN: $ROLE_ARN"
+          echo "Selected AWS region: $AWS_REGION"
+          echo "Selected working directory: $WORKING_DIR"
+          echo "Selected tfvars path: $VAR_FILE_PATH"
+          echo "env_name=$ENV" >> "$GITHUB_OUTPUT"
+          echo "backend_path=$BACKEND_PATH" >> "$GITHUB_OUTPUT"
+          echo "var_file_path=$VAR_FILE_PATH" >> "$GITHUB_OUTPUT"
+          echo "role_arn=$ROLE_ARN" >> "$GITHUB_OUTPUT"
+          echo "aws_region=$AWS_REGION" >> "$GITHUB_OUTPUT"
+          echo "working_dir=$WORKING_DIR" >> "$GITHUB_OUTPUT"
+          echo "terraform_version=$TERRAFORM_VERSION" >> "$GITHUB_OUTPUT"
+          echo "plan_artifact_name=$PLAN_ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+
+  terraform-init-validate:
+    needs: [set-environment]
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ needs.set-environment.outputs.aws_region }}
+      TERRAFORM_VERSION: ${{ needs.set-environment.outputs.terraform_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ needs.set-environment.outputs.role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
+
+      - name: Terraform Validate
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform validate
+
+      - name: Terraform Format
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform fmt -recursive  
+
+
+  terraform-plan:
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.destroy != 'true'
+    needs: [set-environment, terraform-init-validate]
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ needs.set-environment.outputs.aws_region }}
+      TERRAFORM_VERSION: ${{ needs.set-environment.outputs.terraform_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ needs.set-environment.outputs.role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
+
+      - name: Terraform Plan
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform plan -var-file=${{ needs.set-environment.outputs.var_file_path }} -out=tfplan
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.set-environment.outputs.plan_artifact_name }}
+          path: ${{ needs.set-environment.outputs.working_dir }}/tfplan
+
+  terraform-apply:
+    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.destroy != 'true') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/qa'
+    needs: [set-environment, terraform-init-validate, terraform-plan]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.env_name }}
+    env:
+      AWS_REGION: ${{ needs.set-environment.outputs.aws_region }}
+      TERRAFORM_VERSION: ${{ needs.set-environment.outputs.terraform_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ needs.set-environment.outputs.role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.set-environment.outputs.plan_artifact_name }}
+          path: ${{ needs.set-environment.outputs.working_dir }}
+
+      - name: Terraform Init
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
+
+      - name: Terraform Apply
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform apply tfplan
+
+  terraform-destroy:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true'
+    needs: [set-environment, terraform-plan, terraform-init-validate]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.env_name }}
+    env:
+      AWS_REGION: ${{ needs.set-environment.outputs.aws_region }}
+      TERRAFORM_VERSION: ${{ needs.set-environment.outputs.terraform_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials from OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ needs.set-environment.outputs.role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
+
+      - name: Terraform Destroy
+        working-directory: ${{ needs.set-environment.outputs.working_dir }}
+        run: terraform destroy -var-file=${{ needs.set-environment.outputs.var_file_path }} -auto-approve
