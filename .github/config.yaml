@@ -19,8 +19,3 @@ environments:
     role_arn: "xxxxx"
     backend_path: ../config/prd/backend.conf
     var_file_path: env/prd/prd.tfvars
-<<<<<<< HEAD
-
-    
-=======
->>>>>>> 20a5680398bc539732e9af6dfe2523d6beed8ba6
