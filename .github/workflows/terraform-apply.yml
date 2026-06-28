@@ -202,7 +202,7 @@ jobs:
 
   terraform-destroy:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true'
-    needs: [set-environment, terraform-init-validate]
+    needs: [set-environment, terraform-plan, terraform-init-validate]
     runs-on: ubuntu-latest
     environment: ${{ needs.set-environment.outputs.env_name }}
     env:
@@ -226,15 +226,6 @@ jobs:
         working-directory: ${{ needs.set-environment.outputs.working_dir }}
         run: terraform init -input=false -backend-config=${{ needs.set-environment.outputs.backend_path }}
 
-      - name: Terraform Plan (destroy)
-        working-directory: ${{ needs.set-environment.outputs.working_dir }}
-        run: terraform plan -destroy -var-file=${{ needs.set-environment.outputs.var_file_path }} -out=tfplan-destroy || true
-
       - name: Terraform Destroy
         working-directory: ${{ needs.set-environment.outputs.working_dir }}
-        run: |
-          if [ -f "${{ needs.set-environment.outputs.working_dir }}/tfplan-destroy" ]; then
-            terraform apply "${{ needs.set-environment.outputs.working_dir }}/tfplan-destroy"
-          else
-            terraform destroy -var-file=${{ needs.set-environment.outputs.var_file_path }} -auto-approve
-          fi
+        run: terraform destroy -var-file=${{ needs.set-environment.outputs.var_file_path }} -auto-approve
