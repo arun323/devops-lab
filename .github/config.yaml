@@ -25,5 +25,3 @@ environments:
     var_file_path: env/prd/prd.tfvars
     plan_environment_name: prd-plan
     apply_environment_name: prd-apply
-
-    

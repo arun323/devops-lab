@@ -69,11 +69,11 @@ jobs:
           else
             ENV=dev
           fi
-          ROLE_ARN=$(yq ".environments.$ENV.role_arn" .github/config.yaml)
-          AWS_REGION=$(yq '.common.aws_region' .github/config.yaml)
-          WORKING_DIR=$(yq '.common.terraform_working_dir' .github/config.yaml)
-          TERRAFORM_VERSION=$(yq '.common.terraform_version' .github/config.yaml)
-          PLAN_ARTIFACT_NAME=$(yq '.common.plan_artifact_name' .github/config.yaml)
+          ROLE_ARN=$(yq -r ".environments.$ENV.role_arn" .github/config.yaml)
+          AWS_REGION=$(yq -r '.common.aws_region' .github/config.yaml)
+          WORKING_DIR=$(yq -r '.common.terraform_working_dir' .github/config.yaml)
+          TERRAFORM_VERSION=$(yq -r '.common.terraform_version' .github/config.yaml)
+          PLAN_ARTIFACT_NAME=$(yq -r '.common.plan_artifact_name' .github/config.yaml)
           BACKEND_PATH=$(yq -r ".environments.$ENV.backend_path" .github/config.yaml)
           VAR_FILE_PATH=$(yq -r ".environments.$ENV.var_file_path" .github/config.yaml)
           PLAN_ENVIRONMENT_NAME=$(yq -r ".environments.$ENV.plan_environment_name" .github/config.yaml)
